@@ -1,73 +1,85 @@
-/** @format */
 
-let students = JSON.parse(localStorage.getItem("students")) || [];
-let editingIndex = null;
+const API_URL = "https://crudcrud.com/api/e0f97d3c1b324d04846c2f48c77a345e/students";
+let students = [];
+let editingId = null;
 
 const form = document.getElementById("studentForm");
 const list = document.getElementById("studentList");
 const countDisplay = document.getElementById("count");
 
-form.addEventListener("submit", function (e) {
-  e.preventDefault();
+// Load students from API
+async function fetchStudents() {
+  const res = await fetch(API_URL);
+  const data = await res.json();
+  students = data;
+  renderStudents();
+  countDisplay.innerText = `All Students: ${students.length}`;
+}
 
-  const name = document.getElementById("name").value.trim();
-  const mobile = document.getElementById("mobile").value.trim();
-  const address = document.getElementById("address").value.trim();
-
-  if (!name || !mobile || !address) return;
-
-  const student = { name, mobile, address };
-
-  if (editingIndex !== null) {
-    // PUT (Update)
-    students[editingIndex] = student;
-    editingIndex = null;
-    form.querySelector("button").innerText = "Add";
-  } else {
-    // POST (Create)
-    students.push(student);
-  }
-
-  form.reset();
-  saveAndRender();
-});
-
+// Render to UI
 function renderStudents() {
   list.innerHTML = "";
   students.forEach((student, index) => {
     const li = document.createElement("li");
     li.innerHTML = `
       <strong>${student.name}</strong> | ${student.mobile} | ${student.address}
-      <button onclick="editStudent(${index})">Edit</button>
-      <button onclick="deleteStudent(${index})">Delete</button>
+      <button onclick="editStudent('${student._id}', ${index})">Edit</button>
+      <button onclick="deleteStudent('${student._id}')">Delete</button>
     `;
     list.appendChild(li);
   });
 }
 
-function editStudent(index) {
+// Handle form submission
+form.addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const name = document.getElementById("name").value.trim();
+  const mobile = document.getElementById("mobile").value.trim();
+  const address = document.getElementById("address").value.trim();
+  if (!name || !mobile || !address) return;
+
+  const student = { name, mobile, address };
+
+  if (editingId) {
+    // PATCH (update)
+    await fetch(`${API_URL}/${editingId}`, {
+      method: "PUT", // crudcrud uses PUT for full update
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(student),
+    });
+    editingId = null;
+    form.querySelector("button").innerText = "Add";
+  } else {
+    // POST (create)
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(student),
+    });
+  }
+
+  form.reset();
+  fetchStudents(); // Refresh
+});
+
+// Edit student
+function editStudent(id, index) {
   const student = students[index];
   document.getElementById("name").value = student.name;
   document.getElementById("mobile").value = student.mobile;
   document.getElementById("address").value = student.address;
-  editingIndex = index;
+  editingId = id;
   form.querySelector("button").innerText = "Update";
 }
 
-function deleteStudent(index) {
-  // DELETE
-  students.splice(index, 1);
-  saveAndRender();
+// Delete student
+async function deleteStudent(id) {
+  await fetch(`${API_URL}/${id}`, {
+    method: "DELETE",
+  });
+  fetchStudents();
 }
 
-function saveAndRender() {
-  // Simulating GET & POST/PUT/DELETE
-  localStorage.setItem("students", JSON.stringify(students));
-  renderStudents();
-  countDisplay.innerText = `All Students: ${students.length}`;
-}
-
-window.onload = () => {
-  renderStudents();
-  countDisplay.innerText = `All Students: ${students.length}`;
-};
+// On page load
+window.onload = fetchStudents;
